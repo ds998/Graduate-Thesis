@@ -8,9 +8,35 @@
 #include <linux/device.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
+#include <linux/interrupt.h>
+#include <linux/ioctl.h>
+
+#define RD_VALUE _IOR('a','b',int32_t*)
 
 
 #define mem_size 1024
+/*Timer Interrupt*/
+#define IRQ_NO 1
+
+int32_t inter_count=0;
+
+void tasklet_fn(unsigned long);
+
+struct tasklet_struct *tasklet=NULL;
+
+void tasklet_fn(unsigned long arg){
+  printk(KERN_INFO"Tasklet\n");
+  /*Incrementing the Interrupt counter*/
+  inter_count++;
+}
+
+static irqreturn_t irq_handler(int irq,void *dev_id) {
+        printk(KERN_INFO "Shared IRQ: Interrupt Occurred");
+        /*Scheduling Task to Tasklet*/
+        tasklet_schedule(tasklet);
+
+        return IRQ_HANDLED;
+}
 
 dev_t dev=0;
 static struct class *dev_class;
@@ -26,6 +52,7 @@ static int my_open(struct inode *inode,struct file *file);
 static int my_release(struct inode *inode, struct file *file);
 static ssize_t my_read(struct file *filp, char __user *buf, size_t len,loff_t *off);
 static ssize_t my_write(struct file *filp,const char *buf,size_t len, loff_t* off);
+static long  my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 
 
@@ -35,6 +62,7 @@ static struct file_operations fops =
     .read  = my_read,
     .write = my_write,
     .open  = my_open,
+    .unlocked_ioctl = my_ioctl,
     .release = my_release,
 };
 
@@ -116,6 +144,22 @@ static ssize_t my_write(struct file *filp,const char __user *buf,size_t len,loff
   return len;
 }
 
+static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+         switch(cmd) {
+                case RD_VALUE:
+                        if( copy_to_user((int32_t*) arg, &inter_count, sizeof(inter_count)) )
+                        {
+                                pr_err("Data Read : Err!\n");
+                        }
+                        break;
+                default:
+                        pr_info("Default\n");
+                        break;
+        }
+        return 0;
+}
+
 
 static int __init chr_driver_init(void){
   /* Allocating Major number */
@@ -151,8 +195,28 @@ static int __init chr_driver_init(void){
 
   /* Initializing semaphore */
   sema_init(&name,1);
+
+  /*Registering Interrupt Handler */
+
+  if (request_irq(IRQ_NO, irq_handler, IRQF_SHARED, "my_device", (void *)(irq_handler))) {
+    printk(KERN_INFO "Cannot register IRQ...\n");
+    goto irq;
+  }
+  /* Initializing the tasklet bu Dynamic Method */
+  tasklet  = kmalloc(sizeof(struct tasklet_struct),GFP_KERNEL);
+  if(tasklet == NULL) {
+      printk(KERN_INFO "Cannot allocate tasklet...\n");
+      goto irq;
+  }
+  tasklet_init(tasklet,tasklet_fn,0);
+
+
+
   printk(KERN_INFO"Device driver insert...done properly...\n");
   return 0;
+
+irq:
+  free_irq(IRQ_NO,(void *)(irq_handler));
 
 r_device:
   class_destroy(dev_class);
@@ -163,6 +227,11 @@ r_class:
 }
 
 void __exit chr_driver_exit(void){
+  tasklet_kill(tasklet);
+  if(tasklet!=NULL){
+    kfree(tasklet);
+  }
+  free_irq(IRQ_NO,(void*)(irq_handler));
   device_destroy(dev_class,dev);
   class_destroy(dev_class);
   cdev_del(&my_cdev);

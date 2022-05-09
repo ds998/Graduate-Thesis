@@ -6,9 +6,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
+
+#define RD_VALUE _IOR('a','b',int32_t*)
 
 char write_buf[1024];
 char read_buf[1024];
+int32_t interrupt_count;
 
 struct stat info;
 
@@ -31,7 +35,9 @@ int main(){
     printf("Please enter your options...\n");
     printf("      1. Write to a register             \n");
     printf("      2. Read from a register             \n");
-    printf("      3. Exit              \n");
+    printf("      3. Get interrupt count             \n");
+    printf("      4. Exit              \n");
+
     option=getchar();
     printf(" Your options = %c\n",option);
     int success=0;
@@ -119,6 +125,11 @@ int main(){
         printf("Register %d value = %s\n\n",reg_num,read_buf);
         break;
       case '3':
+        printf("Reading interrupt count from driver...\n");
+        ioctl(fd, RD_VALUE, (int32_t*) &interrupt_count);
+        printf("Interrupt count is %d\n", interrupt_count);
+        break;
+      case '4':
         write_buf[0]='e';
         write_buf[1]='x';
         write_buf[2]='i';

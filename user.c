@@ -55,7 +55,7 @@ int main(){
             printf("This is not a number.\n");
           }
           else{
-            if(reg_num<0){
+            if(reg_num<0 || reg_num>63){
               printf("Register number out of range.\n");
             }else{
               success=1;
@@ -99,7 +99,7 @@ int main(){
             printf("This is not a number.\n");
           }
           else{
-            if(reg_num<0){
+            if(reg_num<0 || reg_num>63){
               printf("Register number out of range.\n");
             }else{
               success=1;

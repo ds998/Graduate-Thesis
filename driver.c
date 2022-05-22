@@ -202,7 +202,7 @@ static int __init chr_driver_init(void){
     printk(KERN_INFO "Cannot register IRQ...\n");
     goto irq;
   }
-  /* Initializing the tasklet bu Dynamic Method */
+  /* Initializing the tasklet by Dynamic Method */
   tasklet  = kmalloc(sizeof(struct tasklet_struct),GFP_KERNEL);
   if(tasklet == NULL) {
       printk(KERN_INFO "Cannot allocate tasklet...\n");
